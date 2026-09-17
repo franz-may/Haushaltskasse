@@ -1,0 +1,7 @@
+*.db
+conf/config.yaml
+
+# folders
+venv/
+data/import/
+data/*.*
