@@ -1,5 +1,3 @@
-import sqlite3
-
 import numpy as np
 import pandas as pd
 import yaml
@@ -12,7 +10,7 @@ def ing_de(account):
     df.to_csv(csv_file, sep = ';')
 
 # --- ADAPTER 1: Girokonto 1 (Beispiel: Trennzeichen Semikolon, deutsche Spalten) ---
-def load_account(account, cat_map):
+def load_account(account, cat_map, own_ibans):
     csv_file = account["csv_file"]
     if "pre_process" in account:
         if account["pre_process"] == "ing_de":
@@ -28,21 +26,39 @@ def load_account(account, cat_map):
     #df = df.rename( columns = account["column_mapping"] )
 
 
+    # Datentypen bereinigen (Komma zu Punkt bei Zahlen)
+    if not pd.api.types.is_numeric_dtype(df['amount']):
+        df['amount'] = (
+            df['amount'].astype('string')
+            .str.replace('.', '', regex=False)
+            .str.replace(',', '.', regex=False)
+        )
+        df['amount'] = pd.to_numeric(df['amount'], errors='raise')
+
+    recipient = df.get('recipient', pd.Series('', index=df.index)).astype('string')
+    transfer_condition = pd.Series(False, index=df.index)
+    for iban in own_ibans:
+        transfer_condition |= recipient.str.contains(iban, case=False, regex=False, na=False)
+
     # 3. Bedingungen automatisch für jede Kategorie erstellen
-    conditions = [
+    conditions = [transfer_condition]
+    conditions.extend(
         df["purpose"].str.contains(suchbegriffe, case=False, na=False)
         for suchbegriffe in cat_map.values()
-    ]
+    )
 
     # 4. Die Kategorienamen als Zielwerte extrahieren
-    choices = list(cat_map.keys())
+    choices = ['Umbuchung'] + list(cat_map.keys())
 
-    # 5. Spalte belegen ('default' greift, wenn keine Bedingung erfüllt ist)
-    df["cat1"] = np.select(conditions, choices, default=None)
+    # 5. Spalte belegen; nicht zugeordnete Einträge nach Einnahmen/Ausgaben trennen
+    conditions.extend([df['amount'] > 0, df['amount'] < 0])
+    choices.extend(['Einnahmen_Sonstige', 'Ausgaben_Sonstige'])
+    df["cat1"] = np.select(conditions, choices, default="Sonstige")
+    categories = df["cat1"].str.split('_', n=2, expand=True)
+    df["cat1"] = categories[0]
+    df["cat2"] = categories[1].fillna('')
+    df["cat3"] = categories[2].fillna('')
 
-    # Datentypen bereinigen (Komma zu Punkt bei Zahlen)
-    if df['amount'].dtype == 'object':
-        df['amount'] = df['amount'].str.replace('.', '', regex=False).str.replace(',', '.', regex=False).astype(float)
     df['account'] = account["account"]  # Herkunft markieren
     return df
 
@@ -56,8 +72,9 @@ if __name__ == "__main__":
 
         acc = []
         cat_map = config["cat_map"]
+        own_ibans = [item['iban'] for item in config['accounts']]
         for account in config["accounts"]:
-            acc.append( load_account(account, cat_map) )
+            acc.append(load_account(account, cat_map, own_ibans))
 
         # 2. Das SQL-"UNION ALL"
         # pd.concat klebt die DataFrames untereinander, solange die Spaltennamen identisch sind
@@ -65,40 +82,18 @@ if __name__ == "__main__":
         
         # Datum sauber als Datetime-Objekt parsen
         all_transactions['date'] = pd.to_datetime(all_transactions['date'], dayfirst=True)
-
-        # 2. Verbindung zur SQLite-Datenbank herstellen
-        # Wenn die Datei 'finanzen.db' nicht existiert, wird sie automatisch erstellt!
-        conn = sqlite3.connect('finanzen.db')
         
         # 3. Daten in die Datenbank schreiben (Das "INSERT/REPLACE")
-        # if_exists='replace' überschreibt die Tabelle jedes Mal komplett neu.
-        # Wenn Sie inkrementell Daten anhängen wollen (neue Monate), nutzen Sie 'append'.
-        all_transactions.to_sql('transactions', conn, if_exists='replace', index=False)
-        all_transactions.to_csv('data/transactions.csv', sep = ';')
+        # if_exists='replace' überschreibt die Tabelle jedes Mal komplett neu.       
+        all_transactions[['date', 'cat1', 'cat2', 'cat3', 'purpose', 'amount', 'account']].to_csv(
+            'data/transactions.csv', sep=';', decimal=',', index=False
+        )
         print("Daten erfolgreich in 'finanzen.db' in die Tabelle 'transactions' persistiert.")
 
-        # 4. Der Beweis: Einlesen aus der Datenbank mit echtem SQL!
-        query = """
-            SELECT account, SUM(amount) as Gesamtumsatz 
-            FROM transactions 
-            WHERE amount < 0 
-            GROUP BY account
-        """
-        df_auswertung = pd.read_sql_query(query, conn)
-        
-        print("\n--- Auswertung direkt via SQL-Query aus der DB ---")
-        print(df_auswertung)
-        
-        # Verbindung schließen
-        conn.close()
-
-        # 3. Erste Auswertungen (Der SQL-Vergleich)
-        #print("--- ALLE BUCHUNGEN (UNION) ---")
-        #print(all_transactions.head())
         
         # Entspricht: SELECT account, SUM(amount) FROM all_transactions GROUP BY account;
-        #print("\n--- KONTOSTÄNDE / UMSÄTZE PRO KONTO (GROUP BY) ---")
-        #print(all_transactions.groupby('account')['amount'].sum())
+        print("\n--- KONTOSTÄNDE / UMSÄTZE PRO KONTO (GROUP BY) ---")
+        print(all_transactions.groupby('account')['amount'].sum())
         
     except FileNotFoundError as e:
         print(f"Fehler: CSV-Datei nicht gefunden. Bitte Pfade prüfen! ({e.filename})")
