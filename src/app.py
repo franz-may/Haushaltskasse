@@ -3,6 +3,82 @@ import pandas as pd
 import yaml
 from pathlib import Path
 
+from odf import opendocument
+from odf.table import Table, TableRow, TableCell
+from odf.text import P
+
+
+def build_category_label(row):
+    parts = [row.get('cat1', ''), row.get('cat2', ''), row.get('cat3', '')]
+    return '_'.join(str(part).strip() for part in parts if str(part).strip() and str(part).strip() != 'nan')
+
+
+def export_transactions_ods(df, output_path):
+    ods_df = df.copy()
+    ods_df['category'] = ods_df.apply(build_category_label, axis=1)
+
+    columns = ['date', 'category', 'cat1', 'cat2', 'cat3', 'purpose', 'amount', 'account']
+    data = ods_df.reindex(columns=columns, copy=False)
+
+    doc = opendocument.OpenDocumentSpreadsheet()
+
+    table_data = Table(name='Daten')
+    header_row = TableRow()
+    for col in data.columns:
+        cell = TableCell(valuetype='string')
+        cell.addElement(P(text=str(col)))
+        header_row.addElement(cell)
+    table_data.addElement(header_row)
+
+    for _, row in data.iterrows():
+        odf_row = TableRow()
+        for value in row.tolist():
+            if pd.isna(value):
+                cell = TableCell(valuetype='string')
+                cell.addElement(P(text=''))
+            elif isinstance(value, pd.Timestamp):
+                cell = TableCell(valuetype='string')
+                cell.addElement(P(text=value.strftime('%Y-%m-%d')))
+            elif isinstance(value, (int, float, np.integer, np.floating)):
+                cell = TableCell(valuetype='float')
+                cell.setAttribute('value', str(float(value)))
+                cell.addElement(P(text=str(value)))
+            else:
+                cell = TableCell(valuetype='string')
+                cell.addElement(P(text=str(value)))
+            odf_row.addElement(cell)
+        table_data.addElement(odf_row)
+
+    doc.spreadsheet.addElement(table_data)
+
+    categories = sorted(data['category'].dropna().astype(str).unique().tolist())
+    table_summary = Table(name='Kategorien')
+    header_row = TableRow()
+    for col in ['Kategorie', 'Summe']:
+        cell = TableCell(valuetype='string')
+        cell.addElement(P(text=str(col)))
+        header_row.addElement(cell)
+    table_summary.addElement(header_row)
+
+    for idx, category in enumerate(categories, start=2):
+        summary_row = TableRow()
+
+        name_cell = TableCell(valuetype='string')
+        name_cell.addElement(P(text=str(category)))
+        summary_row.addElement(name_cell)
+
+        sum_formula = f"SUMMEWENN(Daten.B2:B{len(data)+1};Kategorien.A{idx};Daten.G2:G{len(data)+1})"
+        sum_cell = TableCell(valuetype='float')
+        sum_cell.setAttribute('formula', sum_formula)
+        sum_cell.addElement(P(text=''))
+        summary_row.addElement(sum_cell)
+
+        table_summary.addElement(summary_row)
+
+    doc.spreadsheet.addElement(table_summary)
+    doc.save(str(output_path))
+
+
 def export_sonstige_purposes(df, output_dir):
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -30,7 +106,7 @@ def ing_de(account):
     csv_file = csv_file + 'ing_de'
     df.to_csv(csv_file, sep = ';')
 
-# --- ADAPTER 1: Girokonto 1 (Beispiel: Trennzeichen Semikolon, deutsche Spalten) ---
+
 def load_account(account, cat_map, own_ibans):
     csv_file = account["csv_file"]
     if "pre_process" in account:
@@ -45,7 +121,6 @@ def load_account(account, cat_map, own_ibans):
     # 2. Die verbleibenden Spalten umbenennen
     df = df.rename(columns=account["column_mapping"])
     #df = df.rename( columns = account["column_mapping"] )
-
 
     # Datentypen bereinigen (Komma zu Punkt bei Zahlen)
     if not pd.api.types.is_numeric_dtype(df['amount']):
@@ -125,7 +200,7 @@ if __name__ == "__main__":
         export_df.to_csv('data/transactions.csv', sep=';', decimal=',', index=False)
 
         try:
-            export_df.to_excel('data/transactions.ods', index=False, engine='odf')
+            export_transactions_ods(all_transactions, 'data/transactions.ods')
         except Exception as exc:
             print(f"Warnung: ODS-Export nicht möglich: {exc}")
 
