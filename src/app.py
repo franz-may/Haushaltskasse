@@ -121,9 +121,14 @@ if __name__ == "__main__":
         
         # 3. Daten in die Datenbank schreiben (Das "INSERT/REPLACE")
         # if_exists='replace' überschreibt die Tabelle jedes Mal komplett neu.       
-        all_transactions[['date', 'cat1', 'cat2', 'cat3', 'purpose', 'amount', 'account']].to_csv(
-            'data/transactions.csv', sep=';', decimal=',', index=False
-        )
+        export_df = all_transactions[['date', 'cat1', 'cat2', 'cat3', 'purpose', 'amount', 'account']].copy()
+        export_df.to_csv('data/transactions.csv', sep=';', decimal=',', index=False)
+
+        try:
+            export_df.to_excel('data/transactions.ods', index=False, engine='odf')
+        except Exception as exc:
+            print(f"Warnung: ODS-Export nicht möglich: {exc}")
+
         export_sonstige_purposes(all_transactions, Path(__file__).resolve().parent.parent)
         print("Daten erfolgreich in 'finanzen.db' in die Tabelle 'transactions' persistiert.")
 
