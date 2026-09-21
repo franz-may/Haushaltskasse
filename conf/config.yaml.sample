@@ -1,0 +1,28 @@
+accounts:
+  - account: raiba
+    csv_file: data/import/Raiba_Umsaetze_DE12345600000007890123_2026.09.01.csv
+    iban: DE12345600000007890123
+    # concat: Verwendungszweck, Buchungstext
+    column_mapping:
+      Buchungstag: date
+      Betrag: amount
+      Verwendungszweck: purpose
+      IBAN Zahlungsbeteiligter: recipient
+      #TODO: mehrere Spalten zusammenfügen bzw flexiblere Transformation / Bereinigung
+      #Buchungstext: purpose
+  - account: ing
+    csv_file: data/import/Ing_Umsatzanzeige_DE98765432100123456789_2026.csv
+    iban: DE98765432100123456789
+    pre_process: ing_de
+    column_mapping:
+      Wertstellungsdatum: date
+      Betrag: amount
+      Verwendungszweck: purpose
+  - account: mastercard
+    csv_file: data/import/Mastercard_Umsaetze_DE45612300000987456321_2026.csv
+    iban: DE45612300000987456321
+    column_mapping:
+      Buchungstag: date
+      Betrag: amount
+      Verwendungszweck: purpose
+      IBAN Zahlungsbeteiligter: recipient

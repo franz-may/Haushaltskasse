@@ -1,8 +1,10 @@
 *.db
 *.bak
 conf/config.yaml
+conf/cat_map.yaml
 
 # folders
 venv/
 data/import/
 data/*.*
+

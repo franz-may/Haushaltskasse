@@ -1,6 +1,27 @@
 import numpy as np
 import pandas as pd
 import yaml
+from pathlib import Path
+
+def export_sonstige_purposes(df, output_dir):
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    for label, cat1 in [("Ausgaben_Sonstige", "Ausgaben"), ("Einnahmen_Sonstige", "Einnahmen")]:
+        rows = (
+            df.loc[
+                (df["cat1"].astype(str) == cat1)
+                & (df["cat2"].astype(str) == "Sonstige")
+                & df["purpose"].notna(),
+                "purpose",
+            ]
+            .drop_duplicates()
+            .astype(str)
+            .sort_values()
+        )
+        content = "\n".join(f"- {purpose}" for purpose in rows)
+        (output_dir / f"data/{label}.md").write_text(content + ("\n" if content else ""), encoding="utf-8")
+
 
 def ing_de(account):
     csv_file = account["csv_file"]
@@ -43,7 +64,7 @@ def load_account(account, cat_map, own_ibans):
     # 3. Bedingungen automatisch für jede Kategorie erstellen
     conditions = [transfer_condition]
     conditions.extend(
-        df["purpose"].str.contains(suchbegriffe, case=False, na=False)
+        df["purpose"].str.contains(suchbegriffe, case=False, na=False, regex=True)
         for suchbegriffe in cat_map.values()
     )
 
@@ -67,11 +88,26 @@ def load_account(account, cat_map, own_ibans):
 if __name__ == "__main__":
     # 1. Daten laden (Pfade zu Ihren echten CSVs anpassen)
     try:
-        with open('conf/config.yaml', "r", encoding="utf-8") as f:
+        project_root = Path(__file__).resolve().parent.parent
+        config_path = project_root / 'conf' / 'config.yaml'
+        cat_map_path = project_root / 'conf' / 'cat_map.yaml'
+
+        with open(config_path, "r", encoding="utf-8") as f:
             config = yaml.safe_load(f)
 
+        if cat_map_path.exists():
+            with open(cat_map_path, "r", encoding="utf-8") as f:
+                loaded_cat_map = yaml.safe_load(f) or {}
+            cat_map = loaded_cat_map.get("cat_map", loaded_cat_map)
+        else:
+            cat_map = config.get("cat_map", {})
+
+        if not isinstance(cat_map, dict):
+            raise TypeError("cat_map muss ein Dictionary mit String-Werten sein.")
+
+        cat_map = {key: str(value) for key, value in cat_map.items()}
+
         acc = []
-        cat_map = config["cat_map"]
         own_ibans = [item['iban'] for item in config['accounts']]
         for account in config["accounts"]:
             acc.append(load_account(account, cat_map, own_ibans))
@@ -88,6 +124,7 @@ if __name__ == "__main__":
         all_transactions[['date', 'cat1', 'cat2', 'cat3', 'purpose', 'amount', 'account']].to_csv(
             'data/transactions.csv', sep=';', decimal=',', index=False
         )
+        export_sonstige_purposes(all_transactions, Path(__file__).resolve().parent.parent)
         print("Daten erfolgreich in 'finanzen.db' in die Tabelle 'transactions' persistiert.")
 
         

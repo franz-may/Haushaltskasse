@@ -1,0 +1,41 @@
+cat_map:
+  Fixkosten_Wohnen: Teilzahlung Darlehen|TILGUNG
+  Fixkosten_Nebenkosten: SWM|Zweckverband|Wasser|Strom|Gas|Müll|Abwasser|Heizung|Energie|Energieversorgung|Energieversorger|Stadtwerke Weiden|Kaminkehrermeister|ABFALL
+  Fixkosten_Abonnements: Netflix|Spotify|Sky|DAZN|Disney|Amazon Prime|AMZNPrime|Prime Video|Pressevertrieb
+  Fixkosten_Sport: Fitnessstudio
+  Fixkosten_Versicherungen: KFZ|Haftpflicht|Hausrat|Rechtsschutz|Kranken|Renten|Lebensversicherung|Salus BKK
+  Fixkosten_Mobilität: CONTINENTALE|MVV|MV G ABONNEMENT|ADAC
+  Fixkosten_Telefon: Telekom|PremiumSIM|congstar
+  Fixkosten_Steuern: Finanzamt|Steuervorauszahlung|Rundfunk ARD
+  Fixkosten_Konto: Abschluss per|Gebühren i.H. von
+  Fixkosten_Musikunterricht: Musikschule|Musikunterricht
+  Fixkosten_Sparen: LBS SUED
+  Variable_Lebensmittel_Supermarkt: EDEKA|REWE|ALDI|Lidl|Penny|AAG Food|Kaffeerösterei
+  Variable_Lebensmittel_Getränke: Getränke
+  Variable_Gastronomie_Bäckerei: Bäckerei|Baeckerei|Traublinger|Backhaus Kutzer
+  Variable_Gastronomie_Restaurant: Taverne|Taverna|Sushi|Vietnam
+  Variable_Gastronomie__Takeaway: VINZENZ MURR|MCDONALDS|Imbiss Necmi Aslan|MC DONALD S
+  Variable_Bekleidung: tkmaxx|P[+]C|H[+]M|H&M|C&A|Peek&Cloppenburg|krueger-dirndlde|Zara|Zalando|Klarna|Otto
+  Variable_Schule: Gymnasium|Realschule|Grundschule
+  Variable_Schule_Bücher: Buchhandlung|Hugendubel
+  Variable_Schule_Schreibwaren: Schreibwaren
+  Variable_Freizeit: Kino|Theater|Museum|Freizeit|Siebenhuener|Tanzschule|Volkshochschule|Therme Erding
+  Variable_Drogerie: MUELLER|ROSSMANN|DM Drogerie|Sanitaetshaus|RITUALS COSMETICS
+  Variable_Mobilität: Tankstelle|DB Automat|OMV|Aral|ESSO
+  Variable_Pflege: Optik|Douglas
+  Variable_Pflege_Friseur: Barbersho|Frisoer 
+  Urlaub_Gastronomie_Restaurant: ALICE PIZZA|VENEZIA S.L. SELF
+  Urlaub_Bekleidung: MAGLIONE SRL|PELLETTERIA
+  Urlaub_Freizeit: ONE/VIA|Booking.com Attr|Autostrada
+  Urlaub_Mobilität: ASFINAG|DISTRIBUTORE JETRENT|VISA GST|ADAC MEDIEN UND REISE
+  Urlaub_Sonstiges: /IT/|LIGNANO|SAN MICHEL
+  Variable_Baumarkt: Dehner|Hagebau
+  Variable_Gesundheit: Apotheke
+  Bargeld: Bargeld
+  Umbuchung: MASTERCARD Abrechnung
+  Unregelmäßige_Möbel: IKEA|Loberon GmbH|KHG GmbH
+  Unregelmäßige_Auto: KFZ
+  Variable_Geschenke_Deko: NANU NANA|BLUME 2000|OXALIS BLUMENKUNST|SOSTRENE GRENE|TEDi
+  Variable_Elektronik: SATURN ELECTRO
+  Unregelmäßige_Handwerker: Handwerker
+  Unregelmäßige_Sammelposten: Ratepay|Riverty|AMZN Mktp|Amazon.de|AMZNDigital
