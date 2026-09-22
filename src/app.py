@@ -17,7 +17,7 @@ def export_transactions_ods(df, output_path):
     ods_df = df.copy()
     ods_df['category'] = ods_df.apply(build_category_label, axis=1)
 
-    columns = ['date', 'category', 'cat1', 'cat2', 'cat3', 'purpose', 'amount', 'account']
+    columns = ['date', 'category', 'cat1', 'cat2', 'cat3', 'purpose', 'recipient', 'amount', 'account']
     data = ods_df.reindex(columns=columns, copy=False)
 
     doc = opendocument.OpenDocumentSpreadsheet()
@@ -67,7 +67,7 @@ def export_transactions_ods(df, output_path):
         name_cell.addElement(P(text=str(category)))
         summary_row.addElement(name_cell)
 
-        sum_formula = f"SUMMEWENN(Daten.B2:B{len(data)+1};Kategorien.A{idx};Daten.G2:G{len(data)+1})"
+        sum_formula = f"SUMMEWENN(Daten.B2:B{len(data)+1};Kategorien.A{idx};Daten.H2:H{len(data)+1})"
         sum_cell = TableCell(valuetype='float')
         sum_cell.setAttribute('formula', sum_formula)
         sum_cell.addElement(P(text=''))
@@ -108,6 +108,10 @@ def ing_de(account):
 
 
 def load_account(account, cat_map, own_ibans):
+    if "csv_file" not in account:
+        print (f"Warnung: Kein CSV-Dateipfad für Konto '{account.get('account', 'Unbekannt')}' angegeben. Überspringe dieses Konto.")
+        return pd.DataFrame(columns=["date", "cat1", "cat2", "cat3", "purpose", "recipient", "amount", "account"])
+
     csv_file = account["csv_file"]
     if "pre_process" in account:
         if account["pre_process"] == "ing_de":
@@ -130,6 +134,9 @@ def load_account(account, cat_map, own_ibans):
             .str.replace(',', '.', regex=False)
         )
         df['amount'] = pd.to_numeric(df['amount'], errors='raise')
+
+    if 'recipient' not in df:
+        df['recipient'] = ''
 
     recipient = df.get('recipient', pd.Series('', index=df.index)).astype('string')
     transfer_condition = pd.Series(False, index=df.index)
@@ -196,7 +203,7 @@ if __name__ == "__main__":
         
         # 3. Daten in die Datenbank schreiben (Das "INSERT/REPLACE")
         # if_exists='replace' überschreibt die Tabelle jedes Mal komplett neu.       
-        export_df = all_transactions[['date', 'cat1', 'cat2', 'cat3', 'purpose', 'amount', 'account']].copy()
+        export_df = all_transactions[['date', 'cat1', 'cat2', 'cat3', 'purpose', 'recipient', 'amount', 'account']].copy()
         export_df.to_csv('data/transactions.csv', sep=';', decimal=',', index=False)
 
         try:
