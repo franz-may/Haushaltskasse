@@ -4,6 +4,10 @@ import yaml
 from pathlib import Path
 
 from odf import opendocument
+from odf.number import (
+    CurrencyStyle, CurrencySymbol, DateStyle, Day, Month, Number, NumberStyle, Text, Year,
+)
+from odf.style import Style
 from odf.table import Table, TableRow, TableCell
 from odf.text import P
 
@@ -21,6 +25,23 @@ def export_transactions_ods(df, output_path):
     data = ods_df.reindex(columns=columns, copy=False)
 
     doc = opendocument.OpenDocumentSpreadsheet()
+    date_format = DateStyle(name='DateISO', language='de', country='DE')
+    date_format.addElement(Year(style='long'))
+    date_format.addElement(Text(text='-'))
+    date_format.addElement(Month(style='long'))
+    date_format.addElement(Text(text='-'))
+    date_format.addElement(Day(style='long'))
+    doc.automaticstyles.addElement(date_format)
+
+    date_cell_style = Style(name='DateCell', family='table-cell', datastylename='DateISO')
+    doc.automaticstyles.addElement(date_cell_style)
+
+    months_format = NumberStyle(name='MonthsFormat', language='de', country='DE')
+    months_format.addElement(Number(decimalplaces='2', minintegerdigits='1', grouping='false'))
+    doc.automaticstyles.addElement(months_format)
+
+    months_cell_style = Style(name='MonthsCell', family='table-cell', datastylename='MonthsFormat')
+    doc.automaticstyles.addElement(months_cell_style)
 
     table_data = Table(name='Daten')
     header_row = TableRow()
@@ -37,7 +58,11 @@ def export_transactions_ods(df, output_path):
                 cell = TableCell(valuetype='string')
                 cell.addElement(P(text=''))
             elif isinstance(value, pd.Timestamp):
-                cell = TableCell(valuetype='string')
+                cell = TableCell(
+                    valuetype='date',
+                    datevalue=value.strftime('%Y-%m-%d'),
+                    stylename=date_cell_style,
+                )
                 cell.addElement(P(text=value.strftime('%Y-%m-%d')))
             elif isinstance(value, (int, float, np.integer, np.floating)):
                 cell = TableCell(valuetype='float')
@@ -53,14 +78,64 @@ def export_transactions_ods(df, output_path):
 
     categories = sorted(data['category'].dropna().astype(str).unique().tolist())
     table_summary = Table(name='Kategorien')
+    currency_format = CurrencyStyle(name='EuroDE', language='de', country='DE')
+    currency_format.addElement(Number(decimalplaces='2', minintegerdigits='1', grouping='true'))
+    currency_format.addElement(CurrencySymbol(language='de', country='DE', text='€'))
+    doc.automaticstyles.addElement(currency_format)
+
+    currency_cell_style = Style(name='EuroCell', family='table-cell', datastylename='EuroDE')
+    doc.automaticstyles.addElement(currency_cell_style)
+
+    min_date = data['date'].min()
+    max_date = data['date'].max()
+    min_date_text = min_date.strftime('%Y-%m-%d')
+    max_date_text = max_date.strftime('%Y-%m-%d')
+    date_range_days = (max_date - min_date).days
+
+    period_row = TableRow()
+    for label, formula, value, value_type, extra_attributes in [
+        (
+            'Min-Datum',
+            f"MIN(Daten.A2:A{len(data)+1})",
+            min_date_text,
+            'date',
+            {'datevalue': min_date_text, 'stylename': date_cell_style},
+        ),
+        (
+            'Max-Datum',
+            f"MAX(Daten.A2:A{len(data)+1})",
+            max_date_text,
+            'date',
+            {'datevalue': max_date_text, 'stylename': date_cell_style},
+        ),
+        (
+            'Monate',
+            '=(D1-B1)/30.4375',
+            str(date_range_days / 30.4375),
+            'float',
+            {'stylename': months_cell_style},
+        ),
+    ]:
+        label_cell = TableCell(valuetype='string')
+        label_cell.addElement(P(text=label))
+        period_row.addElement(label_cell)
+
+        value_cell = TableCell(valuetype=value_type, formula=formula, **extra_attributes)
+        if value_type == 'float':
+            value_cell.setAttribute('value', value)
+        value_cell.addElement(P(text=value))
+        period_row.addElement(value_cell)
+    table_summary.addElement(period_row)
+
     header_row = TableRow()
-    for col in ['Kategorie', 'Summe']:
+    for col in ['Kategorie', 'Summe', 'Durchschnitt je Monat']:
         cell = TableCell(valuetype='string')
         cell.addElement(P(text=str(col)))
         header_row.addElement(cell)
     table_summary.addElement(header_row)
 
-    for idx, category in enumerate(categories, start=2):
+    category_sums = data.groupby('category')['amount'].sum()
+    for idx, category in enumerate(categories, start=3):
         summary_row = TableRow()
 
         name_cell = TableCell(valuetype='string')
@@ -68,10 +143,26 @@ def export_transactions_ods(df, output_path):
         summary_row.addElement(name_cell)
 
         sum_formula = f"SUMMEWENN(Daten.B2:B{len(data)+1};Kategorien.A{idx};Daten.H2:H{len(data)+1})"
-        sum_cell = TableCell(valuetype='float')
-        sum_cell.setAttribute('formula', sum_formula)
+        sum_cell = TableCell(
+            valuetype='currency',
+            currency='EUR',
+            value=str(float(category_sums[category])),
+            formula=sum_formula,
+            stylename=currency_cell_style,
+        )
         sum_cell.addElement(P(text=''))
         summary_row.addElement(sum_cell)
+
+        monthly_average = category_sums[category] / (date_range_days / 30.4375) if date_range_days else 0
+        average_cell = TableCell(
+            valuetype='currency',
+            currency='EUR',
+            value=str(float(monthly_average)),
+            formula=f"=B{idx}/($F$1+($F$1=0))*($F$1<>0)",
+            stylename=currency_cell_style,
+        )
+        average_cell.addElement(P(text=''))
+        summary_row.addElement(average_cell)
 
         table_summary.addElement(summary_row)
 
